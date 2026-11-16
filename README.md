@@ -1,4 +1,4 @@
-# Cartola — Agenda online para barbearias
+# Barbearia — Agenda online para barbearias
 
 SaaS multi-tenant para barbearias: o cliente agenda sozinho por um link, e o
 barbeiro gerencia a agenda pelo celular e confirma pelo WhatsApp com um toque.
