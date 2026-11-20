@@ -67,6 +67,18 @@ values
   )
 on conflict (id) do nothing;
 
+-- O Auth lê estas colunas como texto e falha com "Database error querying
+-- schema" (login e Admin API quebram) se ficarem NULL. Quem cria pela Admin
+-- API recebe '' automaticamente; inserindo direto, precisamos preencher.
+update auth.users set
+  email_change = coalesce(email_change, ''),
+  email_change_token_new = coalesce(email_change_token_new, ''),
+  email_change_token_current = coalesce(email_change_token_current, ''),
+  phone_change = coalesce(phone_change, ''),
+  phone_change_token = coalesce(phone_change_token, ''),
+  reauthentication_token = coalesce(reauthentication_token, '')
+where email like '%@cartolabarbearia.com.br';
+
 -- O dono da demo só administra: não aparece como opção para o cliente.
 insert into public.users (id, barbershop_id, full_name, role, active, takes_appointments)
 values

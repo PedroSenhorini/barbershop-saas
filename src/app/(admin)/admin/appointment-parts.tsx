@@ -1,8 +1,12 @@
 "use client";
 
-import { Car, Check, MessageCircle, MoreVertical, Play } from "lucide-react";
+import { useState } from "react";
+import { Banknote, Car, Check, CreditCard, MessageCircle, MoreVertical, Play, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { maskPhone } from "@/lib/format";
+import { formatCurrency, maskPhone } from "@/lib/format";
 import { formatDayLong, formatTime } from "@/lib/time";
 import {
   confirmationMessage,
@@ -19,7 +23,12 @@ import {
   reminderMessage,
   whatsAppLink,
 } from "@/lib/whatsapp";
-import type { AppointmentStatus, AppointmentWithRelations } from "@/lib/supabase/types";
+import { PAYMENT_LABEL, PAYMENT_METHODS, paidAmount, parseMoney } from "@/lib/finance";
+import type {
+  AppointmentStatus,
+  AppointmentWithRelations,
+  PaymentMethod,
+} from "@/lib/supabase/types";
 
 /**
  * Peças compartilhadas entre a lista e o quadro da agenda: rótulos de status,
@@ -28,10 +37,12 @@ import type { AppointmentStatus, AppointmentWithRelations } from "@/lib/supabase
 
 export type ShopInfo = { id: string; name: string; timezone: string; siteUrl: string };
 
+export type Payment = { method: PaymentMethod; amount: number };
+
 export type ChangeStatus = (
   a: AppointmentWithRelations,
   status: AppointmentStatus,
-  options?: { silent?: boolean },
+  options?: { silent?: boolean; payment?: Payment },
 ) => void;
 
 export const STATUS_LABEL: Record<AppointmentStatus, string> = {
@@ -141,14 +152,97 @@ export function NextStepButton({
     );
   }
   if (a.status === "em_andamento") {
-    return (
-      <Button className={cn("h-9 gap-1.5", className)} onClick={() => onChangeStatus(a, "finalizado")}>
+    return <FinishButton a={a} onChangeStatus={onChangeStatus} className={className} />;
+  }
+  return null;
+}
+
+const PAYMENT_ICON: Record<PaymentMethod, React.ReactNode> = {
+  dinheiro: <Banknote className="size-5" />,
+  pix: <QrCode className="size-5" />,
+  cartao: <CreditCard className="size-5" />,
+};
+
+/** Finalizar pergunta como o cliente pagou: é o que alimenta o caixa do dia. */
+function FinishButton({
+  a,
+  onChangeStatus,
+  className,
+}: {
+  a: AppointmentWithRelations;
+  onChangeStatus: ChangeStatus;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [method, setMethod] = useState<PaymentMethod | null>(null);
+  const price = Number(a.service?.price ?? 0);
+  const [amount, setAmount] = useState(price.toFixed(2).replace(".", ","));
+  const parsed = parseMoney(amount);
+
+  function finish() {
+    if (!method || parsed === null) return;
+    setOpen(false);
+    onChangeStatus(a, "finalizado", { payment: { method, amount: parsed } });
+  }
+
+  return (
+    <>
+      <Button className={cn("h-9 gap-1.5", className)} onClick={() => setOpen(true)}>
         <Check className="size-4" />
         Finalizar
       </Button>
-    );
-  }
-  return null;
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Como {a.customer_name.split(" ")[0]} pagou?</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-2">
+            {PAYMENT_METHODS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMethod(m)}
+                className={cn(
+                  "flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl border text-sm font-medium transition",
+                  method === m ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:border-primary",
+                )}
+              >
+                {PAYMENT_ICON[m]}
+                {PAYMENT_LABEL[m]}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`amount-${a.id}`}>Valor recebido (R$)</Label>
+            <Input
+              id={`amount-${a.id}`}
+              inputMode="decimal"
+              className="h-11 text-base"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              {a.service ? `Preço do serviço: ${formatCurrency(price)}. ` : ""}
+              Ajuste se teve desconto ou gorjeta.
+            </p>
+          </div>
+          <Button size="lg" className="h-12 text-base" disabled={!method || parsed === null} onClick={finish}>
+            {method ? "Finalizar atendimento" : "Escolha a forma de pagamento"}
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/** Forma e valor do pagamento de um atendimento finalizado. */
+export function PaymentTag({ a }: { a: AppointmentWithRelations }) {
+  if (a.status !== "finalizado" || !a.payment_method) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+      {PAYMENT_LABEL[a.payment_method]} · {formatCurrency(paidAmount(a))}
+    </span>
+  );
 }
 
 export function AppointmentMenu({

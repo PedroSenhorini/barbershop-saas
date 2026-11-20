@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
+import { paidAmount } from "@/lib/finance";
 import { dateIsoInZone, formatDayLong, formatTime } from "@/lib/time";
 import type { BookableBarber } from "@/lib/availability";
 import type {
@@ -30,6 +31,7 @@ import {
   CustomerSignal,
   INACTIVE,
   NextStepButton,
+  PaymentTag,
   STATUS_LABEL,
   STATUS_STYLE,
   type ChangeStatus,
@@ -148,7 +150,7 @@ export function Agenda({
     setTimeout(() => localChanges.current.delete(appointment.id), 10_000);
     startTransition(async () => {
       setOptimisticStatus({ id: appointment.id, status });
-      const result = await updateAppointmentStatus(appointment.id, status);
+      const result = await updateAppointmentStatus(appointment.id, status, options.payment);
       if ("error" in result) {
         toast.error(result.error);
         return;
@@ -182,7 +184,7 @@ export function Agenda({
       expected: active.reduce((sum, a) => sum + price(a), 0),
       done: visible
         .filter((a) => a.status === "finalizado")
-        .reduce((sum, a) => sum + price(a), 0),
+        .reduce((sum, a) => sum + paidAmount(a), 0),
     };
   }, [visible]);
 
@@ -304,6 +306,7 @@ function AppointmentItem({
               {a.service && ` · ${formatCurrency(Number(a.service.price))}`}
             </p>
             <CustomerSignal a={a} />
+            <PaymentTag a={a} />
           </div>
           <AppointmentMenu a={a} shop={barbershop} dateIso={dateIso} onChangeStatus={onChangeStatus} />
         </div>

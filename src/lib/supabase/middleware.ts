@@ -25,9 +25,10 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims renova a sessão quando preciso e valida o JWT localmente, sem a
+  // ida ao servidor de auth que o getUser faria em TODA navegação.
+  const { data: auth } = await supabase.auth.getClaims();
+  const user = auth?.claims.sub;
 
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
   const isAuthRoute = ["/login", "/cadastro"].includes(request.nextUrl.pathname);

@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Scissors, Settings, Users } from "lucide-react";
+import { CalendarDays, Scissors, Settings, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/admin", label: "Agenda", icon: CalendarDays, ownerOnly: false },
+  // Barbeiro também vê: lá aparece só o próprio faturamento.
+  { href: "/admin/financeiro", label: "Financeiro", icon: Wallet, ownerOnly: false },
   { href: "/admin/servicos", label: "Serviços", icon: Scissors, ownerOnly: true },
   { href: "/admin/equipe", label: "Equipe", icon: Users, ownerOnly: true },
   { href: "/admin/ajustes", label: "Ajustes", icon: Settings, ownerOnly: true },

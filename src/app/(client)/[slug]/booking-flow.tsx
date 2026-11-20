@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   CheckCircle2,
   ChevronLeft,
+  ChevronRight,
   Clock,
   Loader2,
   MapPin,
@@ -68,6 +69,11 @@ export function BookingFlow({
   const [step, setStep] = useState<Step>("service");
   const [service, setService] = useState<Service | null>(null);
   const [barberId, setBarberId] = useState<string | null>(null);
+  // null em barberId também significa "qualquer um"; só destacamos depois de
+  // uma escolha real, senão parece pré-selecionado e o cliente fica esperando
+  // um botão de avançar que não existe.
+  const [barberPicked, setBarberPicked] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
   const [dateIso, setDateIso] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slot, setSlot] = useState<Slot | null>(null);
@@ -107,6 +113,7 @@ export function BookingFlow({
 
   function pickBarber(next: string | null) {
     setBarberId(next);
+    setBarberPicked(true);
     if (service) goToDatetime(service, next);
   }
 
@@ -170,9 +177,10 @@ export function BookingFlow({
   }
 
   const stepIndex = steps.indexOf(step);
-  const canSubmit =
-    customer.name.trim().length >= 2 &&
-    [10, 11].includes(customer.phone.replace(/\D/g, "").length);
+  const nameError = customer.name.trim().length < 2 ? "Digite seu nome." : null;
+  const phoneError = [10, 11].includes(customer.phone.replace(/\D/g, "").length)
+    ? null
+    : "Digite o WhatsApp com DDD, ex.: (11) 91234-5678.";
 
   return (
     <div className="flex flex-1 flex-col">
@@ -243,7 +251,7 @@ export function BookingFlow({
         {step === "barber" && (
           <div className="flex flex-col gap-3">
             <ChoiceButton
-              selected={barberId === null}
+              selected={barberPicked && barberId === null}
               onClick={() => pickBarber(null)}
               icon={<Users className="size-5" />}
               title="Qualquer profissional"
@@ -331,8 +339,14 @@ export function BookingFlow({
         {step === "details" && service && slot && dateIso && (
           <form
             className="flex flex-col gap-5"
+            noValidate
             onSubmit={(e) => {
               e.preventDefault();
+              // Botão sempre ativo: um botão cinza sem explicação parecia travado.
+              if (nameError || phoneError) {
+                setShowErrors(true);
+                return;
+              }
               confirm();
             }}
           >
@@ -352,7 +366,9 @@ export function BookingFlow({
                 value={customer.name}
                 onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
                 placeholder="Como podemos te chamar?"
+                aria-invalid={showErrors && !!nameError}
               />
+              {showErrors && nameError && <p className="text-sm text-destructive">{nameError}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="phone">WhatsApp</Label>
@@ -365,13 +381,18 @@ export function BookingFlow({
                 value={maskPhone(customer.phone)}
                 onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
                 placeholder="(11) 91234-5678"
+                aria-invalid={showErrors && !!phoneError}
               />
-              <p className="text-xs text-muted-foreground">
-                A barbearia vai confirmar seu horário por aqui.
-              </p>
+              {showErrors && phoneError ? (
+                <p className="text-sm text-destructive">{phoneError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  A barbearia vai confirmar seu horário por aqui.
+                </p>
+              )}
             </div>
 
-            <Button type="submit" size="lg" className="h-12 text-base" disabled={saving || !canSubmit}>
+            <Button type="submit" size="lg" className="h-12 text-base" disabled={saving}>
               {saving ? <Loader2 className="size-5 animate-spin" /> : "Confirmar agendamento"}
             </Button>
           </form>
@@ -429,6 +450,7 @@ export function BookingFlow({
                 setSlot(null);
                 setDateIso(null);
                 setBarberId(null);
+                setBarberPicked(false);
                 setAssignedBarberId(null);
                 setPublicToken(null);
                 setStep("service");
@@ -485,17 +507,19 @@ function ChoiceButton({
     <button
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-4 rounded-xl border bg-card p-4 text-left transition hover:border-primary",
+        "flex w-full items-center gap-4 rounded-xl border bg-card p-4 text-left transition hover:border-primary active:scale-[0.99]",
         selected && "border-primary",
       )}
     >
       <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
         {icon}
       </div>
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="font-medium">{title}</p>
         {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
       </div>
+      {/* Tocar já avança: a seta deixa claro que não há botão "Continuar". */}
+      <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
     </button>
   );
 }

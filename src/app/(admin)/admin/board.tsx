@@ -8,6 +8,7 @@ import {
   AppointmentMenu,
   CustomerSignal,
   NextStepButton,
+  PaymentTag,
   type ChangeStatus,
   type ShopInfo,
 } from "./appointment-parts";
@@ -134,6 +135,7 @@ function BoardCard({
         <AppointmentMenu a={a} shop={shop} dateIso={dateIso} onChangeStatus={onChangeStatus} />
       </div>
       <CustomerSignal a={a} />
+      <PaymentTag a={a} />
       <NextStepButton
         a={a}
         shop={shop}

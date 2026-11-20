@@ -9,15 +9,16 @@ import type { Barbershop, StaffUser } from "@/lib/supabase/types";
  */
 export const getStaffContext = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  // getClaims valida o JWT localmente (chaves assimétricas do projeto), sem a
+  // ida ao servidor de auth que o getUser faz a cada chamada.
+  const { data: auth } = await supabase.auth.getClaims();
+  const userId = auth?.claims.sub;
+  if (!userId) return null;
 
   const { data } = await supabase
     .from("users")
     .select("*, barbershop:barbershops(*)")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (!data || !data.active) return null;
@@ -25,7 +26,7 @@ export const getStaffContext = cache(async () => {
   const { barbershop, ...profile } = data as StaffUser & {
     barbershop: Barbershop;
   };
-  return { supabase, user, profile: profile as StaffUser, barbershop };
+  return { supabase, profile: profile as StaffUser, barbershop };
 });
 
 export async function requireStaff() {

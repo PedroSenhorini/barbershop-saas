@@ -9,6 +9,49 @@ export type AppointmentStatus =
 
 export type StaffRole = "owner" | "barber";
 
+export type PaymentMethod = "dinheiro" | "pix" | "cartao";
+
+export type ExpenseCategory =
+  | "produtos"
+  | "equipamentos"
+  | "aluguel"
+  | "luz_agua"
+  | "internet"
+  | "salarios"
+  | "impostos"
+  | "outros";
+
+export type Product = {
+  id: string;
+  barbershop_id: string;
+  name: string;
+  quantity: number;
+  min_quantity: number;
+  created_at: string;
+};
+
+export type Expense = {
+  id: string;
+  barbershop_id: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  spent_on: string; // "YYYY-MM-DD"
+  product_id: string | null;
+  quantity: number | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type CashCount = {
+  barbershop_id: string;
+  day: string; // "YYYY-MM-DD"
+  counted: number;
+  notes: string | null;
+  counted_by: string | null;
+  updated_at: string;
+};
+
 /** Expediente de um dia. `null` em WeeklyHours significa fechado. */
 export type DayHours = {
   open: string; // "HH:mm"
@@ -70,6 +113,8 @@ export type Appointment = {
   status: AppointmentStatus;
   public_token: string;
   customer_confirmed_at: string | null;
+  payment_method: PaymentMethod | null;
+  amount_paid: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -155,8 +200,36 @@ export type Database = {
           },
         ];
       };
+      products: {
+        Row: Product;
+        Insert: Partial<Product> & Pick<Product, "barbershop_id" | "name">;
+        Update: Partial<Product>;
+        Relationships: [];
+      };
+      expenses: {
+        Row: Expense;
+        Insert: Partial<Expense> &
+          Pick<Expense, "barbershop_id" | "category" | "description" | "amount">;
+        Update: Partial<Expense>;
+        Relationships: [];
+      };
+      cash_counts: {
+        Row: CashCount;
+        Insert: Partial<CashCount> & Pick<CashCount, "barbershop_id" | "day" | "counted">;
+        Update: Partial<CashCount>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      register_purchase: {
+        Args: { p_product_id: string; p_quantity: number; p_amount: number; p_spent_on: string };
+        Returns: undefined;
+      };
+      adjust_stock: {
+        Args: { p_product_id: string; p_delta: number };
+        Returns: number;
+      };
+    };
   };
 };

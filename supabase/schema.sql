@@ -315,3 +315,139 @@ exception
   when duplicate_object then null;
 end;
 $$;
+
+-- ============================================================================
+-- Financeiro: pagamento dos atendimentos, gastos, estoque e conferência do
+-- caixa. Gastos/estoque/caixa são só do dono; o barbeiro registra a forma de
+-- pagamento ao finalizar (policy de update de appointments, acima).
+-- ============================================================================
+
+-- Registrado ao finalizar. amount_paid pode diferir do preço do serviço
+-- (desconto, gorjeta); sem ele, os relatórios usam o preço do serviço.
+alter table public.appointments add column if not exists payment_method text;
+alter table public.appointments add column if not exists amount_paid numeric(10, 2);
+alter table public.appointments drop constraint if exists appointments_payment_check;
+alter table public.appointments add constraint appointments_payment_check
+  check (
+    (payment_method is null or payment_method in ('dinheiro', 'pix', 'cartao'))
+    and (amount_paid is null or amount_paid >= 0)
+  );
+
+-- products: itens com quantidade em estoque (pomada, lâmina, shampoo...).
+create table if not exists public.products (
+  id uuid primary key default gen_random_uuid(),
+  barbershop_id uuid not null references public.barbershops (id) on delete cascade,
+  name text not null,
+  quantity numeric(10, 2) not null default 0,
+  -- Abaixo disto o painel avisa que está acabando.
+  min_quantity numeric(10, 2) not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists products_barbershop_id_idx on public.products (barbershop_id);
+
+-- expenses: todo dinheiro que sai. Compra de produto aponta para o produto e
+-- a quantidade comprada (ver register_purchase).
+create table if not exists public.expenses (
+  id uuid primary key default gen_random_uuid(),
+  barbershop_id uuid not null references public.barbershops (id) on delete cascade,
+  category text not null,
+  description text not null,
+  amount numeric(10, 2) not null,
+  spent_on date not null default current_date,
+  product_id uuid references public.products (id) on delete set null,
+  quantity numeric(10, 2),
+  created_by uuid references public.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+alter table public.expenses drop constraint if exists expenses_check;
+alter table public.expenses add constraint expenses_check
+  check (
+    amount >= 0
+    and category in ('produtos', 'equipamentos', 'aluguel', 'luz_agua', 'internet', 'salarios', 'impostos', 'outros')
+  );
+create index if not exists expenses_barbershop_spent_idx on public.expenses (barbershop_id, spent_on);
+
+-- cash_counts: quanto o dono contou na gaveta no fim do dia, para comparar
+-- com o que os atendimentos em dinheiro dizem que deveria ter.
+create table if not exists public.cash_counts (
+  barbershop_id uuid not null references public.barbershops (id) on delete cascade,
+  day date not null,
+  counted numeric(10, 2) not null check (counted >= 0),
+  notes text,
+  counted_by uuid references public.users (id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (barbershop_id, day)
+);
+
+alter table public.products enable row level security;
+alter table public.expenses enable row level security;
+alter table public.cash_counts enable row level security;
+
+drop policy if exists "Dono gerencia produtos" on public.products;
+create policy "Dono gerencia produtos"
+  on public.products for all
+  using (barbershop_id = public.current_barbershop_id() and public.is_owner())
+  with check (barbershop_id = public.current_barbershop_id() and public.is_owner());
+
+drop policy if exists "Dono gerencia gastos" on public.expenses;
+create policy "Dono gerencia gastos"
+  on public.expenses for all
+  using (barbershop_id = public.current_barbershop_id() and public.is_owner())
+  with check (barbershop_id = public.current_barbershop_id() and public.is_owner());
+
+drop policy if exists "Dono gerencia caixa" on public.cash_counts;
+create policy "Dono gerencia caixa"
+  on public.cash_counts for all
+  using (barbershop_id = public.current_barbershop_id() and public.is_owner())
+  with check (barbershop_id = public.current_barbershop_id() and public.is_owner());
+
+-- Compra de produto: soma no estoque E lança o gasto, numa transação só.
+-- security invoker: roda com as permissões de quem chama, então as policies
+-- acima garantem que só o dono da própria barbearia consegue.
+create or replace function public.register_purchase(
+  p_product_id uuid,
+  p_quantity numeric,
+  p_amount numeric,
+  p_spent_on date
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_name text;
+  v_shop uuid;
+begin
+  if p_quantity is null or p_quantity <= 0 or p_amount is null or p_amount < 0 then
+    raise exception 'Quantidade ou valor inválido';
+  end if;
+
+  update public.products
+  set quantity = quantity + p_quantity
+  where id = p_product_id
+  returning name, barbershop_id into v_name, v_shop;
+  if v_shop is null then
+    raise exception 'Produto não encontrado';
+  end if;
+
+  insert into public.expenses
+    (barbershop_id, category, description, amount, spent_on, product_id, quantity, created_by)
+  values
+    (v_shop, 'produtos', 'Compra: ' || v_name, p_amount, p_spent_on, p_product_id, p_quantity, auth.uid());
+end;
+$$;
+
+-- Uso/venda de produto: baixa no estoque sem ficar negativo. Atômico para
+-- dois toques seguidos não se perderem.
+create or replace function public.adjust_stock(p_product_id uuid, p_delta numeric)
+returns numeric
+language sql
+security invoker
+set search_path = public
+as $$
+  update public.products
+  set quantity = greatest(quantity + p_delta, 0)
+  where id = p_product_id
+  returning quantity;
+$$;
