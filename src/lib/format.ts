@@ -32,8 +32,10 @@ export function slugify(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
+    .slice(0, 40)
+    // Depois do corte: cortar no meio de "a-b" deixaria um hífen no fim, que a
+    // CHECK de formato do slug (schema.sql) recusa.
+    .replace(/^-+|-+$/g, "");
 }
 
 export function initials(name: string) {

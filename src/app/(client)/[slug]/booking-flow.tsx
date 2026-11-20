@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Honeypot, Turnstile, turnstileEnabled } from "@/components/anti-spam";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDuration, initials, maskPhone } from "@/lib/format";
 import { formatDayLong, formatDayShort } from "@/lib/time";
@@ -74,6 +75,9 @@ export function BookingFlow({
   // um botão de avançar que não existe.
   const [barberPicked, setBarberPicked] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const honeypotRef = useRef<HTMLInputElement>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileKey, setTurnstileKey] = useState(0);
   const [dateIso, setDateIso] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slot, setSlot] = useState<Slot | null>(null);
@@ -132,10 +136,15 @@ export function BookingFlow({
         scheduledAt: slot.iso,
         customerName: customer.name,
         customerPhone: customer.phone,
+        website: honeypotRef.current?.value ?? "",
+        turnstileToken,
       });
 
       if ("error" in result) {
         toast.error(result.error);
+        // O token do Turnstile vale um envio só: pede outro.
+        setTurnstileToken(null);
+        setTurnstileKey((k) => k + 1);
         if (dateIso) loadSlots(dateIso, service, barberId);
         setStep("datetime");
         return;
@@ -338,13 +347,17 @@ export function BookingFlow({
 
         {step === "details" && service && slot && dateIso && (
           <form
-            className="flex flex-col gap-5"
+            className="relative flex flex-col gap-5"
             noValidate
             onSubmit={(e) => {
               e.preventDefault();
               // Botão sempre ativo: um botão cinza sem explicação parecia travado.
               if (nameError || phoneError) {
                 setShowErrors(true);
+                return;
+              }
+              if (turnstileEnabled && !turnstileToken) {
+                toast.info("Aguarde a verificação de segurança terminar.");
                 return;
               }
               confirm();
@@ -391,6 +404,9 @@ export function BookingFlow({
                 </p>
               )}
             </div>
+
+            <Honeypot inputRef={honeypotRef} />
+            <Turnstile key={turnstileKey} onToken={setTurnstileToken} />
 
             <Button type="submit" size="lg" className="h-12 text-base" disabled={saving}>
               {saving ? <Loader2 className="size-5 animate-spin" /> : "Confirmar agendamento"}

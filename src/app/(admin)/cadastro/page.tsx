@@ -6,6 +6,7 @@ import { Loader2, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Honeypot, Turnstile } from "@/components/anti-spam";
 import { maskPhone } from "@/lib/format";
 import { signUp } from "./actions";
 
@@ -26,7 +27,7 @@ export default function SignUpPage() {
           </p>
         </div>
 
-        <form action={formAction} className="space-y-4 rounded-xl border bg-card p-5">
+        <form action={formAction} className="relative space-y-4 rounded-xl border bg-card p-5">
           <Field label="Nome da barbearia" name="barbershopName" placeholder="Ex.: Barbearia do Zé" autoFocus defaultValue={state.values?.barbershopName} />
           <Field label="Seu nome" name="fullName" autoComplete="name" defaultValue={state.values?.fullName} />
           <div className="space-y-1.5">
@@ -67,6 +68,9 @@ export default function SignUpPage() {
               </span>
             </span>
           </label>
+
+          <Honeypot />
+          <Turnstile key={state.attempt ?? 0} />
 
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 

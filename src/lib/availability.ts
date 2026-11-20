@@ -1,7 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateDaySlots, hoursForDate } from "@/lib/hours";
+import { hoursForDate } from "@/lib/hours";
+import { computeFreeSlots, type Slot } from "@/lib/slots";
 import type { AppointmentStatus, Barbershop, Service } from "@/lib/supabase/types";
-import { addDaysIso, dateIsoInZone, formatTime, zonedDateTime } from "@/lib/time";
+import { addDaysIso, dateIsoInZone, zonedDateTime } from "@/lib/time";
+
+export type { Slot };
 
 /**
  * Regra única de disponibilidade, usada pela página pública e pelo painel.
@@ -12,14 +15,10 @@ import { addDaysIso, dateIsoInZone, formatTime, zonedDateTime } from "@/lib/time
 
 const INACTIVE_STATUSES: AppointmentStatus[] = ["cancelado", "faltou"];
 
-export type BookableBarber = { id: string; full_name: string };
+/** Agendamentos futuros ativos que um mesmo telefone pode ter por barbearia. */
+const MAX_FUTURE_BOOKINGS_PER_PHONE = 2;
 
-export type Slot = {
-  iso: string;
-  label: string;
-  /** Barbeiros livres nesse horário (já filtrado pela preferência do cliente). */
-  barberIds: string[];
-};
+export type BookableBarber = { id: string; full_name: string };
 
 export async function getBookableBarbers(barbershopId: string) {
   const supabase = createAdminClient();
@@ -68,37 +67,21 @@ export async function computeAvailability({
     .lt("scheduled_at", dayEnd.toISOString())
     .gt("ends_at", dayStart.toISOString());
 
-  const busy = (existing ?? []).map((a) => ({
-    start: new Date(a.scheduled_at).getTime(),
-    end: new Date(a.ends_at).getTime(),
-    barberId: a.barber_id,
-  }));
-
-  const now = Date.now();
-  const durationMs = service.duration_minutes * 60_000;
-
-  return generateDaySlots(dateIso, day, service.duration_minutes, tz)
-    .filter((slot) => includePast || slot.getTime() > now)
-    .flatMap((slot) => {
-      const start = slot.getTime();
-      const end = start + durationMs;
-      const overlapping = busy.filter((b) => start < b.end && b.start < end);
-      const isFree = (id: string) => !overlapping.some((b) => b.barberId === id);
-
-      // Agendamentos antigos sem barbeiro definido ocupam "alguém" da equipe.
-      const unassigned = overlapping.filter((b) => b.barberId === null).length;
-      const totalFree = allBarbers.filter((b) => isFree(b.id)).length - unassigned;
-      const freeCandidates = candidates.filter((b) => isFree(b.id));
-
-      if (totalFree <= 0 || freeCandidates.length === 0) return [];
-      return [
-        {
-          iso: slot.toISOString(),
-          label: formatTime(slot, tz),
-          barberIds: freeCandidates.map((b) => b.id),
-        },
-      ];
-    });
+  return computeFreeSlots({
+    dateIso,
+    day,
+    durationMinutes: service.duration_minutes,
+    timeZone: tz,
+    busy: (existing ?? []).map((a) => ({
+      start: new Date(a.scheduled_at).getTime(),
+      end: new Date(a.ends_at).getTime(),
+      barberId: a.barber_id,
+    })),
+    barberIds: allBarbers.map((b) => b.id),
+    barberId,
+    now: Date.now(),
+    includePast,
+  });
 }
 
 export type BookingInput = {
@@ -136,6 +119,24 @@ export async function bookAppointment(
   }
   if (!input.fromPanel && (!barbershop.active || !service.active)) {
     return { error: "Esta barbearia não está aceitando agendamentos online no momento." };
+  }
+
+  // Anti-spam do site público: um robô não consegue lotar a agenda com um
+  // número só. O painel (encaixe feito pelo barbeiro) não tem esse limite.
+  if (!input.fromPanel) {
+    const { count } = await supabase
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("barbershop_id", barbershop.id)
+      .eq("customer_phone", input.customerPhone)
+      .not("status", "in", `(${INACTIVE_STATUSES.join(",")})`)
+      .gt("scheduled_at", new Date().toISOString());
+    if ((count ?? 0) >= MAX_FUTURE_BOOKINGS_PER_PHONE) {
+      return {
+        error:
+          "Você já tem 2 horários marcados nesta barbearia. Para marcar outro, cancele um deles ou fale com a barbearia pelo WhatsApp.",
+      };
+    }
   }
 
   const scheduledAt = new Date(input.scheduledAt);

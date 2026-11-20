@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Ferramentas de agentes (fora do git; podem conter cópias do projeto).
+    ".agents/**",
+    ".aider-desk/**",
+    ".claude/**",
   ]),
 ]);
 

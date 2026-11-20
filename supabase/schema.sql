@@ -49,6 +49,12 @@ alter table public.barbershops
 alter table public.barbershops
   add column if not exists active boolean not null default true;
 
+-- Formato do link público, igual ao slugSchema de src/lib/slugs.ts: a
+-- validação não depende só do app.
+alter table public.barbershops drop constraint if exists barbershops_slug_format_check;
+alter table public.barbershops add constraint barbershops_slug_format_check
+  check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$');
+
 -- Migração da versão antiga (opening_time/closing_time únicos para todos os
 -- dias, domingo fechado fixo no código) para weekly_hours.
 do $$
@@ -248,6 +254,14 @@ drop policy if exists "Dono atualiza a propria barbearia" on public.barbershops;
 create policy "Dono atualiza a propria barbearia"
   on public.barbershops for update
   using (id = public.current_barbershop_id() and public.is_owner());
+
+-- A policy acima diz QUAIS linhas o dono altera; isto limita QUAIS colunas.
+-- Sem isso, a sessão do navegador poderia fazer update({ active: true }) e
+-- reativar uma barbearia suspensa por falta de pagamento. `active` só muda
+-- pela service role (painel do Supabase).
+revoke update on public.barbershops from authenticated;
+grant update (name, phone, address, slug, timezone, weekly_hours)
+  on public.barbershops to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- users (staff): visível apenas para colegas da mesma barbearia. Leitura

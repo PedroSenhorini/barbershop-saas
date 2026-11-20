@@ -32,6 +32,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# ferramentas de agentes (ficam só na máquina de quem usa)
+/.agents/
+/.aider-desk/
+/.claude/
+/skills-lock.json
 
 # vercel
 .vercel
