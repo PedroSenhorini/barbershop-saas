@@ -32,7 +32,7 @@ function LinkActions({ bookingUrl, barbershopName }: { bookingUrl: string; barbe
           Copiar
         </Button>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
         <a
           href={whatsAppShareLink(shareMessage(barbershopName, bookingUrl))}
           target="_blank"

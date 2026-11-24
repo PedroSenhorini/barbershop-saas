@@ -118,6 +118,15 @@
 }
 
 @layer base {
+  /* Item de grid nunca fica mais largo que a coluna: sem isso um texto com
+     truncate ou um <select> com opção longa "empurra" a tela para os lados
+     no celular (aconteceu em Vender e Mais). */
+  .grid > * {
+    min-width: 0;
+  }
+}
+
+@layer base {
   * {
     @apply border-border outline-ring/50;
   }
@@ -126,5 +135,28 @@
   }
   html {
     @apply font-sans;
+    /* Sem o atraso de toque duplo e sem o flash azul ao tocar (cara de app). */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* iPhone dá zoom em campos com fonte menor que 16px: garante no celular. */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
+  }
+}
+
+/* Quem pede menos movimento no sistema não vê animações nem transições. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

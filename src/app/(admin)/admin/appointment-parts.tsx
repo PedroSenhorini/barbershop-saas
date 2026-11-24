@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Banknote, Car, Check, CreditCard, MessageCircle, MoreVertical, Play, QrCode } from "lucide-react";
+import { Banknote, Car, Check, CreditCard, Crown, HandCoins, MessageCircle, MoreVertical, Play, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,7 +23,7 @@ import {
   reminderMessage,
   whatsAppLink,
 } from "@/lib/whatsapp";
-import { PAYMENT_LABEL, PAYMENT_METHODS, paidAmount, parseMoney } from "@/lib/finance";
+import { FINISH_METHODS, PAYMENT_LABEL, paidAmount, parseMoney } from "@/lib/finance";
 import type {
   AppointmentStatus,
   AppointmentWithRelations,
@@ -45,25 +45,9 @@ export type ChangeStatus = (
   options?: { silent?: boolean; payment?: Payment },
 ) => void;
 
-export const STATUS_LABEL: Record<AppointmentStatus, string> = {
-  solicitado: "Aguardando confirmação",
-  confirmado: "Confirmado",
-  a_caminho: "A caminho",
-  em_andamento: "Atendendo",
-  finalizado: "Finalizado",
-  cancelado: "Cancelado",
-  faltou: "Faltou",
-};
-
-export const STATUS_STYLE: Record<AppointmentStatus, string> = {
-  solicitado: "bg-amber-100 text-amber-900",
-  confirmado: "bg-sky-100 text-sky-900",
-  a_caminho: "bg-indigo-100 text-indigo-900",
-  em_andamento: "bg-violet-100 text-violet-900",
-  finalizado: "bg-emerald-100 text-emerald-900",
-  cancelado: "bg-muted text-muted-foreground",
-  faltou: "bg-red-100 text-red-900",
-};
+// Em lib/ para páginas do servidor (ex.: ficha do cliente) também usarem:
+// constantes exportadas de um arquivo "use client" não chegam ao servidor.
+export { STATUS_LABEL, STATUS_STYLE } from "@/lib/appointment-status";
 
 export const INACTIVE: AppointmentStatus[] = ["cancelado", "faltou"];
 
@@ -91,14 +75,14 @@ function hasPhone(a: AppointmentWithRelations) {
 export function CustomerSignal({ a }: { a: AppointmentWithRelations }) {
   if (a.status === "a_caminho") {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 dark:text-indigo-400">
         <Car className="size-3.5" /> Cliente a caminho
       </span>
     );
   }
   if (a.status !== "confirmado") return null;
   return a.customer_confirmed_at ? (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
       <Check className="size-3.5" /> Cliente confirmou presença
     </span>
   ) : (
@@ -161,6 +145,8 @@ const PAYMENT_ICON: Record<PaymentMethod, React.ReactNode> = {
   dinheiro: <Banknote className="size-5" />,
   pix: <QrCode className="size-5" />,
   cartao: <CreditCard className="size-5" />,
+  fiado: <HandCoins className="size-5" />,
+  plano: <Crown className="size-5" />,
 };
 
 /** Finalizar pergunta como o cliente pagou: é o que alimenta o caixa do dia. */
@@ -197,11 +183,16 @@ function FinishButton({
             <DialogTitle>Como {a.customer_name.split(" ")[0]} pagou?</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-3 gap-2">
-            {PAYMENT_METHODS.map((m) => (
+            {FINISH_METHODS.map((m) => (
               <button
                 key={m}
                 type="button"
-                onClick={() => setMethod(m)}
+                onClick={() => {
+                  setMethod(m);
+                  // Plano do Clube: a receita entra pela mensalidade, não aqui.
+                  if (m === "plano") setAmount("0,00");
+                  else if (method === "plano") setAmount(price.toFixed(2).replace(".", ","));
+                }}
                 className={cn(
                   "flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl border text-sm font-medium transition",
                   method === m ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:border-primary",
@@ -224,6 +215,8 @@ function FinishButton({
             <p className="text-xs text-muted-foreground">
               {a.service ? `Preço do serviço: ${formatCurrency(price)}. ` : ""}
               Ajuste se teve desconto ou gorjeta.
+              {method === "fiado" && " Fica na lista de Fiado até o cliente pagar."}
+              {method === "plano" && " Coberto pela assinatura: não entra no caixa."}
             </p>
           </div>
           <Button size="lg" className="h-12 text-base" disabled={!method || parsed === null} onClick={finish}>
@@ -239,7 +232,7 @@ function FinishButton({
 export function PaymentTag({ a }: { a: AppointmentWithRelations }) {
   if (a.status !== "finalizado" || !a.payment_method) return null;
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
       {PAYMENT_LABEL[a.payment_method]} · {formatCurrency(paidAmount(a))}
     </span>
   );

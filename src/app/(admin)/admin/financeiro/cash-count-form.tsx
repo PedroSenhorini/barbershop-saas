@@ -65,9 +65,9 @@ export function CashCountForm({
         <p
           className={cn(
             "rounded-lg px-3 py-2 text-sm font-medium",
-            diff === 0 && "bg-emerald-50 text-emerald-900",
-            diff > 0 && "bg-sky-50 text-sky-900",
-            diff < 0 && "bg-red-50 text-red-900",
+            diff === 0 && "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200",
+            diff > 0 && "bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200",
+            diff < 0 && "bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200",
           )}
         >
           {diff === 0

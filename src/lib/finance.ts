@@ -1,11 +1,17 @@
-import type { ExpenseCategory, PaymentMethod } from "@/lib/supabase/types";
+import type { CashMethod, ExpenseCategory, PaymentMethod } from "@/lib/supabase/types";
 
-export const PAYMENT_METHODS: PaymentMethod[] = ["dinheiro", "pix", "cartao"];
+/** Formas em que o dinheiro entra na hora (caixa do dia). */
+export const PAYMENT_METHODS: CashMethod[] = ["dinheiro", "pix", "cartao"];
+
+/** Opções ao finalizar um atendimento: as de cima + fiado e plano do Clube. */
+export const FINISH_METHODS: PaymentMethod[] = [...PAYMENT_METHODS, "fiado", "plano"];
 
 export const PAYMENT_LABEL: Record<PaymentMethod, string> = {
   dinheiro: "Dinheiro",
   pix: "Pix",
   cartao: "Cartão",
+  fiado: "Fiado",
+  plano: "Plano do Clube",
 };
 
 export const EXPENSE_CATEGORIES: ExpenseCategory[] = [

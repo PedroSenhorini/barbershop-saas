@@ -54,7 +54,7 @@ export function Board({
             key={col.key}
             onClick={() => setSelected(col.key)}
             className={cn(
-              "flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition",
+              "flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition active:opacity-80",
               selected === col.key ? "border-primary bg-primary text-primary-foreground" : "bg-card",
             )}
           >

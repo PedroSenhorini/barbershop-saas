@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { bookAppointment, computeAvailability, type Slot } from "@/lib/availability";
 import { onlyDigits } from "@/lib/format";
 import { isValidDateIso } from "@/lib/time";
+import { normalizeSource } from "@/lib/labels";
 import { verifyTurnstile } from "@/lib/turnstile";
 
 /**
@@ -56,6 +57,8 @@ const createAppointmentSchema = z.object({
 });
 
 export type CreateAppointmentInput = z.input<typeof createAppointmentSchema> & {
+  /** ?origem= do link; inválido é ignorado. */
+  source?: string | null;
   /** Campo-isca (ver components/anti-spam.tsx). */
   website?: string;
   turnstileToken?: string | null;
@@ -77,7 +80,11 @@ export async function createAppointment(
     return { error: "Não conseguimos confirmar que você não é um robô. Tente de novo." };
   }
 
-  const result = await bookAppointment({ ...parsed.data, status: "solicitado" });
+  const result = await bookAppointment({
+    ...parsed.data,
+    status: "solicitado",
+    source: normalizeSource(input.source),
+  });
   if ("error" in result) return result;
   return { success: true, barberId: result.barberId, publicToken: result.publicToken };
 }

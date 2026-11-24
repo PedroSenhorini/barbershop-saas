@@ -91,7 +91,7 @@ export function SettingsForm({ barbershop, siteUrl }: { barbershop: Barbershop; 
             />
           </div>
           {slug !== barbershop.slug && (
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-amber-700 dark:text-amber-400">
               Atenção: o link antigo vai parar de funcionar. Atualize onde você já divulgou.
             </p>
           )}
@@ -145,17 +145,17 @@ function DayRow({
   return (
     <li className="space-y-2 py-3">
       <div className="flex items-center justify-between gap-2">
-        <label className="flex items-center gap-2 font-medium">
+        <label className="flex min-h-11 items-center gap-2.5 font-medium md:min-h-0">
           <input
             type="checkbox"
-            className="size-4 accent-primary"
+            className="size-5 accent-primary md:size-4"
             checked={!!value}
             onChange={(e) => onChange(e.target.checked ? { ...DEFAULT_DAY } : null)}
           />
           {label}
         </label>
         {value ? (
-          <button type="button" onClick={onCopyToAll} className="text-xs text-primary hover:underline">
+          <button type="button" onClick={onCopyToAll} className="min-h-11 px-1 text-sm text-primary hover:underline md:min-h-0 md:text-xs">
             Copiar para todos
           </button>
         ) : (
@@ -186,7 +186,7 @@ function DayRow({
               />
               <button
                 type="button"
-                className="text-xs text-muted-foreground hover:underline"
+                className="min-h-11 px-1 text-sm text-muted-foreground hover:underline md:min-h-0 md:text-xs"
                 onClick={() => onChange({ ...value, breakStart: null, breakEnd: null })}
               >
                 remover
@@ -195,7 +195,7 @@ function DayRow({
           ) : (
             <button
               type="button"
-              className="text-xs text-primary hover:underline"
+              className="min-h-11 text-sm text-primary hover:underline md:min-h-0 md:text-xs"
               onClick={() => onChange({ ...value, breakStart: "12:00", breakEnd: "13:00" })}
             >
               + Adicionar intervalo de almoço
@@ -223,7 +223,7 @@ function TimeInput({
       aria-label={label}
       value={value}
       onChange={(e) => e.target.value && onChange(e.target.value.slice(0, 5))}
-      className="h-10 rounded-lg border border-input bg-background px-2 text-base md:text-sm"
+      className="h-11 rounded-lg border border-input bg-background px-2 text-base md:h-10 md:text-sm"
     />
   );
 }

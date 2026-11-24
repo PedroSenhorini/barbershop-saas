@@ -40,7 +40,7 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           Ainda não tem conta?{" "}
-          <Link href="/cadastro" className="font-medium text-primary hover:underline">
+          <Link href="/cadastro" className="inline-flex min-h-11 items-center px-1 font-medium text-primary hover:underline md:min-h-0">
             Criar minha barbearia
           </Link>
         </p>

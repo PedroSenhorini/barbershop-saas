@@ -29,7 +29,7 @@ export function StockList({ products, today }: { products: Product[]; today: str
   return (
     <div className="space-y-4">
       {low.length > 0 && (
-        <p className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <span>
             Acabando: <b>{low.map((p) => p.name).join(", ")}</b>
@@ -89,10 +89,10 @@ function ProductRow({ product: p, onBuy }: { product: Product; onBuy: () => void
   }
 
   return (
-    <li className={cn("flex items-center gap-3 rounded-xl border bg-card p-3", isLow && "border-amber-300")}>
+    <li className={cn("flex items-center gap-3 rounded-xl border bg-card p-3", isLow && "border-amber-300 dark:border-amber-800")}>
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{p.name}</p>
-        <p className={cn("text-sm", isLow ? "font-medium text-amber-700" : "text-muted-foreground")}>
+        <p className={cn("text-sm", isLow ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
           {qty(p.quantity)} em estoque
           {Number(p.min_quantity) > 0 && ` · mínimo ${qty(p.min_quantity)}`}
         </p>

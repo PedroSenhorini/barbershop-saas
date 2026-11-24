@@ -118,3 +118,13 @@ export function formatDayShort(dateIso: string) {
 function pad(n: number) {
   return String(n).padStart(2, "0");
 }
+
+/** Dias inteiros desde `iso` até agora (0 se for no futuro). */
+export function daysSince(iso: string, now: number = Date.now()) {
+  return Math.max(0, Math.floor((now - new Date(iso).getTime()) / 86_400_000));
+}
+
+/** Instante (ms) de `days` dias atrás. Fora do render: o lint de pureza do React não reclama. */
+export function msDaysAgo(days: number, now: number = Date.now()) {
+  return now - days * 86_400_000;
+}

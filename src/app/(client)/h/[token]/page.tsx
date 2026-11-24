@@ -8,6 +8,7 @@ import { dateIsoInZone, formatDayLong, formatTime } from "@/lib/time";
 import { whatsAppLink } from "@/lib/whatsapp";
 import type { AppointmentStatus } from "@/lib/supabase/types";
 import { CustomerActions } from "./customer-actions";
+import { FeedbackForm } from "./feedback-form";
 
 // Link pessoal: nunca deve aparecer em buscadores.
 export const metadata: Metadata = {
@@ -15,7 +16,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-type Shop = { name: string; phone: string | null; address: string | null; timezone: string; slug: string };
+type Shop = {
+  name: string;
+  phone: string | null;
+  address: string | null;
+  timezone: string;
+  slug: string;
+  google_review_url: string | null;
+};
 
 async function loadAppointment(token: string) {
   if (!/^[0-9a-f]{32}$/.test(token)) return null;
@@ -23,7 +31,7 @@ async function loadAppointment(token: string) {
   const { data } = await createAdminClient()
     .from("appointments")
     .select(
-      "status, scheduled_at, ends_at, customer_name, customer_confirmed_at, service:services(name), barber:users(full_name), barbershop:barbershops(name, phone, address, timezone, slug)",
+      "id, status, scheduled_at, ends_at, customer_name, customer_confirmed_at, service:services(name), barber:users(full_name), barbershop:barbershops(name, phone, address, timezone, slug, google_review_url)",
     )
     .eq("public_token", token)
     .single();
@@ -32,27 +40,27 @@ async function loadAppointment(token: string) {
 
 const STATUS_COPY: Record<AppointmentStatus, { icon: React.ReactNode; title: string; text: string }> = {
   solicitado: {
-    icon: <Clock className="size-6 text-amber-600" />,
+    icon: <Clock className="size-6 text-amber-600 dark:text-amber-400" />,
     title: "Aguardando a barbearia",
     text: "Seu pedido chegou. Você recebe a confirmação pelo WhatsApp.",
   },
   confirmado: {
-    icon: <CalendarClock className="size-6 text-sky-600" />,
+    icon: <CalendarClock className="size-6 text-sky-600 dark:text-sky-400" />,
     title: "Horário confirmado",
     text: "Te esperamos lá!",
   },
   a_caminho: {
-    icon: <Car className="size-6 text-indigo-600" />,
+    icon: <Car className="size-6 text-indigo-600 dark:text-indigo-400" />,
     title: "Você está a caminho",
     text: "A barbearia já sabe. Até já!",
   },
   em_andamento: {
-    icon: <Scissors className="size-6 text-violet-600" />,
+    icon: <Scissors className="size-6 text-violet-600 dark:text-violet-400" />,
     title: "Atendimento em andamento",
     text: "Bom corte!",
   },
   finalizado: {
-    icon: <CheckCircle2 className="size-6 text-emerald-600" />,
+    icon: <CheckCircle2 className="size-6 text-emerald-600 dark:text-emerald-400" />,
     title: "Atendimento finalizado",
     text: "Obrigado pela visita!",
   },
@@ -98,10 +106,20 @@ export default async function CustomerAppointmentPage({
 
   const copy = STATUS_COPY[appt.status];
   const firstName = appt.customer_name.trim().split(/\s+/)[0];
+  const feedback =
+    appt.status === "finalizado"
+      ? (
+          await createAdminClient()
+            .from("customer_feedback")
+            .select("rating")
+            .eq("appointment_id", appt.id)
+            .maybeSingle()
+        ).data
+      : null;
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="space-y-1 border-b bg-primary px-5 pb-5 pt-8 text-primary-foreground">
+      <header className="space-y-1 border-b bg-primary px-5 pb-5 pt-[calc(2rem+env(safe-area-inset-top))] text-primary-foreground dark:bg-card dark:text-card-foreground">
         <p className="text-sm opacity-80">Olá, {firstName}!</p>
         <h1 className="text-2xl font-semibold">{shop.name}</h1>
         {shop.address && <p className="text-sm opacity-80">{shop.address}</p>}
@@ -135,6 +153,12 @@ export default async function CustomerAppointmentPage({
           canCancel={canCancel}
           goHint={appt.status === "confirmado" && !isToday && beforeStart}
         />
+
+        {appt.status === "finalizado" && (
+
+          <FeedbackForm token={token} existing={feedback?.rating ?? null} googleUrl={shop.google_review_url} />
+
+        )}
 
         <div className="mt-auto space-y-2">
           {ended && (

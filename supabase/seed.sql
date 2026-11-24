@@ -1,5 +1,5 @@
 -- ============================================================================
--- Seed de demonstração — "Cartola Barbearia"
+-- Seed de demonstração — "Barbearia Modelo"
 -- Rode depois do schema.sql. Cria uma barbearia com dono + barbeiros,
 -- serviços e uma agenda de HOJE já cheia, prontos para o pitch.
 -- Senha de todos os funcionários de demo: "demo1234"
@@ -11,7 +11,7 @@
 insert into public.barbershops (id, name, slug, phone, address, weekly_hours)
 values (
   '11111111-1111-4111-8111-111111111111',
-  'Cartola Barbearia',
+  'Barbearia Modelo',
   'demo-barbearia',
   '11988887777',
   'Rua Augusta, 1200 — São Paulo, SP',
@@ -42,7 +42,7 @@ values
     '00000000-0000-0000-0000-000000000000',
     '22222222-2222-4222-8222-222222222222',
     'authenticated', 'authenticated',
-    'dono@cartolabarbearia.com.br',
+    'dono@barbeariamodelo.com.br',
     crypt('demo1234', gen_salt('bf')),
     now(), '{"provider":"email","providers":["email"]}', '{}',
     now(), now(), '', ''
@@ -51,7 +51,7 @@ values
     '00000000-0000-0000-0000-000000000000',
     '33333333-3333-4333-8333-333333333333',
     'authenticated', 'authenticated',
-    'rafael.barbeiro@cartolabarbearia.com.br',
+    'rafael.barbeiro@barbeariamodelo.com.br',
     crypt('demo1234', gen_salt('bf')),
     now(), '{"provider":"email","providers":["email"]}', '{}',
     now(), now(), '', ''
@@ -60,7 +60,7 @@ values
     '00000000-0000-0000-0000-000000000000',
     '44444444-4444-4444-8444-444444444444',
     'authenticated', 'authenticated',
-    'juliana.barbeira@cartolabarbearia.com.br',
+    'juliana.barbeira@barbeariamodelo.com.br',
     crypt('demo1234', gen_salt('bf')),
     now(), '{"provider":"email","providers":["email"]}', '{}',
     now(), now(), '', ''
@@ -77,7 +77,7 @@ update auth.users set
   phone_change = coalesce(phone_change, ''),
   phone_change_token = coalesce(phone_change_token, ''),
   reauthentication_token = coalesce(reauthentication_token, '')
-where email like '%@cartolabarbearia.com.br';
+where email like '%@barbeariamodelo.com.br';
 
 -- O dono da demo só administra: não aparece como opção para o cliente.
 insert into public.users (id, barbershop_id, full_name, role, active, takes_appointments)

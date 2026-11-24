@@ -59,24 +59,44 @@ export async function computeAvailability({
   const dayEnd = zonedDateTime(addDaysIso(dateIso, 1), "00:00", tz);
 
   const supabase = createAdminClient();
-  const { data: existing } = await supabase
-    .from("appointments")
-    .select("scheduled_at, ends_at, barber_id")
-    .eq("barbershop_id", barbershop.id)
-    .not("status", "in", `(${INACTIVE_STATUSES.join(",")})`)
-    .lt("scheduled_at", dayEnd.toISOString())
-    .gt("ends_at", dayStart.toISOString());
+  const [{ data: existing }, { data: blocks }] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select("scheduled_at, ends_at, barber_id")
+      .eq("barbershop_id", barbershop.id)
+      .not("status", "in", `(${INACTIVE_STATUSES.join(",")})`)
+      .lt("scheduled_at", dayEnd.toISOString())
+      .gt("ends_at", dayStart.toISOString()),
+    supabase
+      .from("time_blocks")
+      .select("starts_at, ends_at, barber_id")
+      .eq("barbershop_id", barbershop.id)
+      .lt("starts_at", dayEnd.toISOString())
+      .gt("ends_at", dayStart.toISOString()),
+  ]);
+
+  // Bloqueio (folga, férias) ocupa a agenda como um agendamento. Sem
+  // barbeiro, fecha a barbearia toda: vira um ocupado para cada barbeiro.
+  const blockedBusy = (blocks ?? []).flatMap((b) => {
+    const start = new Date(b.starts_at).getTime();
+    const end = new Date(b.ends_at).getTime();
+    const ids = b.barber_id ? [b.barber_id] : allBarbers.map((x) => x.id);
+    return ids.map((barberId) => ({ start, end, barberId }));
+  });
 
   return computeFreeSlots({
     dateIso,
     day,
     durationMinutes: service.duration_minutes,
     timeZone: tz,
-    busy: (existing ?? []).map((a) => ({
-      start: new Date(a.scheduled_at).getTime(),
-      end: new Date(a.ends_at).getTime(),
-      barberId: a.barber_id,
-    })),
+    busy: [
+      ...(existing ?? []).map((a) => ({
+        start: new Date(a.scheduled_at).getTime(),
+        end: new Date(a.ends_at).getTime(),
+        barberId: a.barber_id,
+      })),
+      ...blockedBusy,
+    ],
     barberIds: allBarbers.map((b) => b.id),
     barberId,
     now: Date.now(),
@@ -94,6 +114,10 @@ export type BookingInput = {
   status: AppointmentStatus;
   /** Painel: permite lançar um encaixe num horário que já começou hoje. */
   fromPanel?: boolean;
+  /** Ocorrência de uma série de horário fixo (ver lib/recurring.ts). */
+  seriesId?: string;
+  /** Origem do agendamento (?origem= no link público). */
+  source?: string | null;
 };
 
 export async function bookAppointment(
@@ -167,6 +191,8 @@ export async function bookAppointment(
         scheduledAt.getTime() + service.duration_minutes * 60_000,
       ).toISOString(),
       status: input.status,
+      series_id: input.seriesId ?? null,
+      source: input.source ?? null,
     })
     .select("id, public_token")
     .single();

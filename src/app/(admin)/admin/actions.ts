@@ -1,5 +1,7 @@
 "use server";
 
+import type { PaymentMethod } from "@/lib/supabase/types";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -26,7 +28,7 @@ const statusSchema = z.enum([
 ]);
 
 const paymentSchema = z.object({
-  method: z.enum(["dinheiro", "pix", "cartao"]),
+  method: z.enum(["dinheiro", "pix", "cartao", "fiado", "plano"]),
   amount: z.number().min(0, "Valor inválido.").max(100_000, "Valor inválido."),
 });
 
@@ -40,20 +42,38 @@ export async function updateAppointmentStatus(
 
   // Pagamento só existe em atendimento finalizado: sair de "finalizado"
   // (desfazer, voltar para confirmado) limpa, para o caixa não contar errado.
-  let paymentFields: { payment_method: "dinheiro" | "pix" | "cartao" | null; amount_paid: number | null } = {
+  let paymentFields: { payment_method: PaymentMethod | null; amount_paid: number | null } = {
     payment_method: null,
     amount_paid: null,
   };
   if (parsedStatus.data === "finalizado" && payment) {
     const parsedPayment = paymentSchema.safeParse(payment);
     if (!parsedPayment.success) return { error: parsedPayment.error.issues[0].message };
+    const { method } = parsedPayment.data;
     paymentFields = {
-      payment_method: parsedPayment.data.method,
-      amount_paid: Math.round(parsedPayment.data.amount * 100) / 100,
+      payment_method: method,
+      // Plano: a receita entra pela mensalidade do Clube, não pelo atendimento.
+      amount_paid: method === "plano" ? 0 : Math.round(parsedPayment.data.amount * 100) / 100,
     };
   }
 
   const supabase = await createClient();
+  if (paymentFields.payment_method === "plano" || paymentFields.payment_method === "fiado") {
+    const { data: appt } = await supabase
+      .from("appointments")
+      .select("customer_id")
+      .eq("id", appointmentId)
+      .maybeSingle();
+    if (!appt?.customer_id) return { error: "Este atendimento não tem cliente cadastrado." };
+    if (paymentFields.payment_method === "plano") {
+      const { count } = await supabase
+        .from("club_subscriptions")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", appt.customer_id)
+        .eq("status", "ativa");
+      if (!count) return { error: "Este cliente não tem assinatura ativa no Clube." };
+    }
+  }
   // RLS garante que só agendamentos da própria barbearia são alterados.
   const { data, error } = await supabase
     .from("appointments")

@@ -62,10 +62,10 @@ const FEATURES = [
 export default function LandingPage() {
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between px-5 py-4 sm:px-8">
+      <header className="flex items-center justify-between px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] sm:px-8">
         <div className="flex items-center gap-2">
           <Scissors className="size-5 text-primary" />
-          <span className="font-semibold">Cartola</span>
+          <span className="font-semibold">Barbearia</span>
         </div>
         <Link href="/login" className={buttonVariants({ variant: "ghost" })}>
           Entrar

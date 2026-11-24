@@ -1,11 +1,17 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import {
+  AtSign,
+  Bell,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Link as LinkIcon,
   Clock,
+  Hourglass,
   Loader2,
   MapPin,
   MessageCircle,
@@ -17,11 +23,12 @@ import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Honeypot, Turnstile, turnstileEnabled } from "@/components/anti-spam";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDuration, initials, maskPhone } from "@/lib/format";
 import { formatDayLong, formatDayShort } from "@/lib/time";
-import { customerNoticeMessage, whatsAppLink } from "@/lib/whatsapp";
+import { customerNoticeMessage, whatsAppLink, whatsAppShareLink } from "@/lib/whatsapp";
 import type { BookableBarber, Slot } from "@/lib/availability";
 import type { Service } from "@/lib/supabase/types";
 import { createAppointment, getSlots } from "./actions";
@@ -30,14 +37,19 @@ type Step = "service" | "barber" | "datetime" | "details" | "success";
 
 type PublicBarbershop = {
   id: string;
+  slug: string;
   name: string;
   phone: string | null;
   address: string | null;
   active: boolean;
   hoursSummary: string;
+  /** Texto "sobre" que o dono escreve em Fidelidade. */
+  about?: string | null;
+  /** Usuário do Instagram, sem @. */
+  instagram?: string | null;
 };
 
-const SAVED_CUSTOMER_KEY = "cartola:cliente";
+const SAVED_CUSTOMER_KEY = "barbearia:cliente";
 
 function readSavedCustomer(): { name: string; phone: string } {
   try {
@@ -55,12 +67,15 @@ export function BookingFlow({
   barbers,
   days,
   todayIso,
+  source = null,
 }: {
   barbershop: PublicBarbershop;
   services: Service[];
   barbers: BookableBarber[];
   days: { iso: string; open: boolean }[];
   todayIso: string;
+  /** Origem do link (?origem=instagram), para o relatório de canais. */
+  source?: string | null;
 }) {
   const hasBarberChoice = barbers.length > 1;
   const steps: Step[] = hasBarberChoice
@@ -138,6 +153,7 @@ export function BookingFlow({
         customerPhone: customer.phone,
         website: honeypotRef.current?.value ?? "",
         turnstileToken,
+        source,
       });
 
       if ("error" in result) {
@@ -157,6 +173,8 @@ export function BookingFlow({
       }
       setAssignedBarberId(result.barberId);
       setPublicToken(result.publicToken);
+      // Pixel da Meta (se a barbearia configurou): conta o agendamento.
+      (window as { fbq?: (...args: unknown[]) => void }).fbq?.("track", "Schedule");
       setStep("success");
     });
   }
@@ -196,7 +214,7 @@ export function BookingFlow({
       {step === "service" ? (
         <ShopHeader barbershop={barbershop} />
       ) : step !== "success" ? (
-        <header className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background/95 px-3 py-3 backdrop-blur">
+        <header className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background/95 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur">
           <Button variant="ghost" size="icon-lg" onClick={goBack} aria-label="Voltar">
             <ChevronLeft className="size-5" />
           </Button>
@@ -221,7 +239,7 @@ export function BookingFlow({
         </div>
       )}
 
-      <div className="flex-1 p-5">
+      <div className="flex flex-1 flex-col p-5">
         {step === "service" && (
           <div className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">Escolha o serviço</h2>
@@ -234,7 +252,7 @@ export function BookingFlow({
               <button
                 key={s.id}
                 onClick={() => pickService(s)}
-                className="flex w-full items-center gap-4 rounded-xl border bg-card p-4 text-left transition hover:border-primary active:scale-[0.99]"
+                className="flex w-full items-center gap-4 rounded-xl border bg-card p-4 text-left transition hover:border-primary active:scale-[0.98]"
               >
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Scissors className="size-5" />
@@ -254,6 +272,7 @@ export function BookingFlow({
                 <p className="font-semibold">{formatCurrency(s.price)}</p>
               </button>
             ))}
+            <ExtraLinks slug={barbershop.slug} />
           </div>
         )}
 
@@ -290,7 +309,7 @@ export function BookingFlow({
                     disabled={!d.open}
                     onClick={() => loadSlots(d.iso, service, barberId)}
                     className={cn(
-                      "flex w-16 shrink-0 flex-col items-center rounded-xl border py-2.5 transition",
+                      "flex w-16 shrink-0 flex-col items-center rounded-xl border py-2.5 transition active:scale-[0.97]",
                       selected
                         ? "border-primary bg-primary text-primary-foreground"
                         : "bg-card hover:border-primary",
@@ -313,13 +332,18 @@ export function BookingFlow({
                   {formatDayLong(dateIso)}
                 </p>
                 {loadingSlots ? (
-                  <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" />
-                    Buscando horários...
+                  <div className="grid grid-cols-4 gap-2" aria-busy="true" aria-label="Buscando horários">
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <Skeleton key={i} className="h-11 rounded-lg" />
+                    ))}
                   </div>
                 ) : slots.length === 0 ? (
                   <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    Sem horários livres nesse dia. Tente outro dia.
+                    Sem horários livres nesse dia. Tente outro dia ou{" "}
+                    <Link href={`/${barbershop.slug}/espera`} className="font-medium text-foreground underline underline-offset-2">
+                      entre na lista de espera
+                    </Link>
+                    .
                   </p>
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
@@ -331,7 +355,7 @@ export function BookingFlow({
                           setStep("details");
                         }}
                         className={cn(
-                          "h-11 rounded-lg border text-sm font-medium transition hover:border-primary",
+                          "h-11 rounded-lg border text-base font-medium transition hover:border-primary active:scale-[0.97] md:text-sm",
                           slot?.iso === s.iso && "border-primary bg-primary text-primary-foreground",
                         )}
                       >
@@ -347,7 +371,7 @@ export function BookingFlow({
 
         {step === "details" && service && slot && dateIso && (
           <form
-            className="relative flex flex-col gap-5"
+            className="relative flex flex-1 flex-col gap-5"
             noValidate
             onSubmit={(e) => {
               e.preventDefault();
@@ -408,14 +432,16 @@ export function BookingFlow({
             <Honeypot inputRef={honeypotRef} />
             <Turnstile key={turnstileKey} onToken={setTurnstileToken} />
 
-            <Button type="submit" size="lg" className="h-12 text-base" disabled={saving}>
-              {saving ? <Loader2 className="size-5 animate-spin" /> : "Confirmar agendamento"}
-            </Button>
+            <StickyAction>
+              <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={saving}>
+                {saving ? <Loader2 className="size-5 animate-spin" /> : "Confirmar agendamento"}
+              </Button>
+            </StickyAction>
           </form>
         )}
 
         {step === "success" && service && slot && dateIso && (
-          <div className="flex flex-col items-center gap-6 py-10 text-center">
+          <div className="flex flex-1 flex-col items-center gap-6 pt-10 text-center">
             <CheckCircle2 className="size-16 text-primary" />
             <div className="space-y-1">
               <p className="text-xl font-semibold">Horário reservado!</p>
@@ -431,35 +457,7 @@ export function BookingFlow({
                 barberName={selectedBarber?.full_name}
               />
             </div>
-            {barbershop.phone && (
-              <a
-                href={whatsAppLink(
-                  barbershop.phone,
-                  customerNoticeMessage({
-                    customerName: customer.name,
-                    serviceName: service.name,
-                    dayLabel: formatDayLong(dateIso),
-                    timeLabel: slot.label,
-                    barbershopName: barbershop.name,
-                    barberName: selectedBarber?.full_name,
-                  }),
-                )}
-                target="_blank"
-                rel="noreferrer"
-                className={cn(buttonVariants({ size: "lg" }), "h-12 w-full gap-2 text-base")}
-              >
-                <MessageCircle className="size-5" />
-                Avisar a barbearia no WhatsApp
-              </a>
-            )}
-            {publicToken && (
-              <a
-                href={`/h/${publicToken}`}
-                className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-12 w-full text-base")}
-              >
-                Acompanhar meu horário
-              </a>
-            )}
+            {publicToken && <PersonalLink token={publicToken} />}
             <Button
               variant="ghost"
               onClick={() => {
@@ -474,6 +472,29 @@ export function BookingFlow({
             >
               Fazer outro agendamento
             </Button>
+            {barbershop.phone && (
+              <StickyAction>
+                <a
+                  href={whatsAppLink(
+                    barbershop.phone,
+                    customerNoticeMessage({
+                      customerName: customer.name,
+                      serviceName: service.name,
+                      dayLabel: formatDayLong(dateIso),
+                      timeLabel: slot.label,
+                      barbershopName: barbershop.name,
+                      barberName: selectedBarber?.full_name,
+                    }),
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(buttonVariants({ size: "lg" }), "h-12 w-full gap-2 text-base")}
+                >
+                  <MessageCircle className="size-5" />
+                  Falar com a barbearia no WhatsApp
+                </a>
+              </StickyAction>
+            )}
           </div>
         )}
       </div>
@@ -481,10 +502,69 @@ export function BookingFlow({
   );
 }
 
+/**
+ * Ação principal da etapa. No celular fica presa ao rodapé (acima da área
+ * segura do iPhone) enquanto a página rola; no computador, volta ao fluxo.
+ * Vai como último filho do conteúdo, então nunca cobre nada no fim da página.
+ */
+function StickyAction({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-auto w-[calc(100%+2.5rem)] border-t bg-background/95 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur md:static md:mx-0 md:mb-0 md:w-full md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+      {children}
+    </div>
+  );
+}
+
+/** Link pessoal do horário (/h/token): confirmar, avisar que está a caminho ou cancelar. */
+function PersonalLink({ token }: { token: string }) {
+  const url = `${window.location.origin}/h/${token}`;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copiado");
+    } catch {
+      toast.info(url, { description: "Copie o link acima" });
+    }
+  }
+
+  return (
+    <div className="w-full space-y-3 rounded-xl border bg-card p-4 text-left">
+      <div className="space-y-1">
+        <p className="flex items-center gap-2 font-medium">
+          <LinkIcon className="size-4" />
+          Seu link do horário
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Guarde este link para confirmar presença, avisar que está a caminho ou cancelar.
+        </p>
+      </div>
+      <a href={url} className="block truncate rounded-lg bg-muted px-3 py-3 text-sm font-medium underline-offset-2 hover:underline">
+        {url.replace(/^https?:\/\//, "")}
+      </a>
+      <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+        <Button variant="outline" className="h-11 gap-1.5" onClick={copy}>
+          <Copy className="size-4" />
+          Copiar
+        </Button>
+        <a
+          href={whatsAppShareLink(`Meu horário na barbearia: ${url}`)}
+          target="_blank"
+          rel="noreferrer"
+          className={cn(buttonVariants({ variant: "outline" }), "h-11 gap-1.5")}
+        >
+          <MessageCircle className="size-4" />
+          Salvar no WhatsApp
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function ShopHeader({ barbershop }: { barbershop: PublicBarbershop }) {
   return (
-    <header className="space-y-2 border-b bg-primary px-5 pb-5 pt-8 text-primary-foreground">
-      <div className="flex size-12 items-center justify-center rounded-full bg-primary-foreground/15">
+    <header className="space-y-2 border-b bg-primary px-5 pb-5 pt-[calc(2rem+env(safe-area-inset-top))] text-primary-foreground dark:bg-card dark:text-card-foreground">
+      <div className="flex size-12 items-center justify-center rounded-full bg-primary-foreground/15 dark:bg-foreground/10">
         <Scissors className="size-6" />
       </div>
       <h1 className="text-2xl font-semibold">{barbershop.name}</h1>
@@ -501,8 +581,48 @@ function ShopHeader({ barbershop }: { barbershop: PublicBarbershop }) {
             {barbershop.hoursSummary}
           </p>
         )}
+        {barbershop.instagram && (
+          <a
+            href={`https://instagram.com/${barbershop.instagram}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex w-fit items-center gap-1.5 underline-offset-2 hover:underline"
+          >
+            <AtSign className="size-3.5 shrink-0" />
+            {barbershop.instagram}
+          </a>
+        )}
       </div>
+      {barbershop.about && (
+        <p className="whitespace-pre-line pt-1 text-sm opacity-90">{barbershop.about}</p>
+      )}
     </header>
+  );
+}
+
+/** Atalhos para quem não vai agendar agora: lista de espera e cadastro de novidades. */
+function ExtraLinks({ slug }: { slug: string }) {
+  const item =
+    "flex items-center gap-3 rounded-xl border border-dashed px-4 py-3 text-sm transition hover:border-primary active:scale-[0.99]";
+  return (
+    <div className="mt-4 grid gap-2">
+      <Link href={`/${slug}/espera`} className={item}>
+        <Hourglass className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1">
+          <span className="font-medium">Sem horário que sirva?</span>{" "}
+          <span className="text-muted-foreground">Entre na lista de espera.</span>
+        </span>
+        <ChevronRight className="size-4 text-muted-foreground" />
+      </Link>
+      <Link href={`/${slug}/cadastro`} className={item}>
+        <Bell className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1">
+          <span className="font-medium">Receba novidades</span>{" "}
+          <span className="text-muted-foreground">e promoções da barbearia.</span>
+        </span>
+        <ChevronRight className="size-4 text-muted-foreground" />
+      </Link>
+    </div>
   );
 }
 

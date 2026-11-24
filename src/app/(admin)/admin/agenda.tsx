@@ -214,7 +214,7 @@ export function Agenda({
       )}
 
       {stats.pending > 0 && (
-        <p className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
           <CircleDot className="size-4" />
           {stats.pending === 1
             ? "1 cliente aguardando sua confirmação"
@@ -284,8 +284,8 @@ function AppointmentItem({
     <li
       className={cn(
         "flex gap-3 rounded-xl border bg-card p-3",
-        a.status === "solicitado" && "border-amber-300",
-        a.status === "a_caminho" && "border-indigo-300",
+        a.status === "solicitado" && "border-amber-300 dark:border-amber-800",
+        a.status === "a_caminho" && "border-indigo-300 dark:border-indigo-800",
         inactive && "opacity-60",
       )}
     >
@@ -337,7 +337,7 @@ function ViewButton({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition",
+        "flex h-11 items-center gap-1.5 rounded-md px-3.5 text-sm font-medium transition active:opacity-80 md:h-8 md:px-3",
         active ? "bg-primary text-primary-foreground" : "text-muted-foreground",
       )}
     >
@@ -369,7 +369,7 @@ function FilterChip({
     <button
       onClick={onClick}
       className={cn(
-        "h-8 shrink-0 rounded-full border px-3.5 text-sm font-medium transition",
+        "h-11 shrink-0 rounded-full border px-4 text-sm font-medium transition active:opacity-80 md:h-8 md:px-3.5",
         active ? "border-primary bg-primary text-primary-foreground" : "bg-card",
       )}
     >

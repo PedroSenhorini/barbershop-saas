@@ -22,8 +22,10 @@ import {
   todayIso,
   zonedDateTime,
 } from "@/lib/time";
-import type { CashCount, Expense, PaymentMethod, Product } from "@/lib/supabase/types";
+import type { CashCount, CashMovement, Expense, PaymentMethod, Product } from "@/lib/supabase/types";
 import { CashCountForm } from "./cash-count-form";
+import { CashMovements } from "./cash-movements";
+import { drawerAdjustment, extraIncome } from "./extra-income";
 import { ExpenseList } from "./expenses";
 import { StockList } from "./stock";
 
@@ -69,8 +71,13 @@ async function finishedBetween(
   return (data ?? []) as unknown as Finished[];
 }
 
+/** Fiado e plano do Clube não são dinheiro que entrou no dia. */
+function isCashIn(a: Finished) {
+  return a.payment_method !== "fiado" && a.payment_method !== "plano";
+}
+
 function totalsByMethod(items: Finished[]) {
-  const totals: Record<PaymentMethod | "sem", number> = { dinheiro: 0, pix: 0, cartao: 0, sem: 0 };
+  const totals: Record<PaymentMethod | "sem", number> = { dinheiro: 0, pix: 0, cartao: 0, fiado: 0, plano: 0, sem: 0 };
   for (const a of items) totals[a.payment_method ?? "sem"] += paidAmount(a);
   return totals;
 }
@@ -107,7 +114,7 @@ export default async function FinancePage({
             key={t.key}
             href={`/admin/financeiro?aba=${t.key}`}
             className={cn(
-              "flex h-9 shrink-0 items-center rounded-full border px-4 text-sm font-medium transition",
+              "flex h-11 shrink-0 items-center rounded-full border px-4 text-sm font-medium transition active:opacity-80 md:h-9",
               tab === t.key ? "border-primary bg-primary text-primary-foreground" : "bg-card",
             )}
           >
@@ -138,12 +145,17 @@ async function CashTab({
   today: string;
   tz: string;
 }) {
-  const [items, { data: count }] = await Promise.all([
+  const [items, { data: count }, extra, { data: movements }] = await Promise.all([
     finishedBetween(supabase, day, addDaysIso(day, 1), tz),
     supabase.from("cash_counts").select("*").eq("barbershop_id", shopId).eq("day", day).maybeSingle(),
+    extraIncome(supabase, day, addDaysIso(day, 1), tz),
+    supabase.from("cash_movements").select("*").eq("day", day).order("created_at"),
   ]);
   const totals = totalsByMethod(items);
-  const total = items.reduce((s, a) => s + paidAmount(a), 0);
+  // Vendas, fiado recebido e mensalidades do Clube entram por forma de pagamento.
+  for (const m of PAYMENT_METHODS) totals[m] += extra.byMethod[m];
+  const total = items.filter(isCashIn).reduce((s, a) => s + paidAmount(a), 0) + extra.total;
+  const drawer = (movements ?? []) as CashMovement[];
 
   const byBarber = new Map<string, { name: string; count: number; total: number }>();
   for (const a of items) {
@@ -169,15 +181,29 @@ async function CashTab({
         ))}
         <Stat label="Total do dia" value={formatCurrency(total)} strong />
       </div>
+      {(extra.total > 0 || totals.fiado > 0 || extra.salesOnCredit > 0) && (
+        <p className="text-xs text-muted-foreground">
+          {[
+            extra.sales > 0 && `Vendas: ${formatCurrency(extra.sales)}`,
+            extra.debtsReceived > 0 && `Fiado recebido: ${formatCurrency(extra.debtsReceived)}`,
+            extra.club > 0 && `Mensalidades do Clube: ${formatCurrency(extra.club)}`,
+            totals.fiado + extra.salesOnCredit > 0 && `Ficou no fiado: ${formatCurrency(totals.fiado + extra.salesOnCredit)}`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      )}
       {totals.sem > 0 && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="rounded-lg bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
           {formatCurrency(totals.sem)} em atendimentos finalizados sem forma de pagamento registrada.
         </p>
       )}
 
+      <CashMovements day={day} movements={drawer} />
+
       <CashCountForm
         day={day}
-        expected={totals.dinheiro}
+        expected={totals.dinheiro + drawerAdjustment(drawer)}
         saved={(count as CashCount | null) ?? null}
       />
 
@@ -216,7 +242,7 @@ async function ExpensesTab({
   tz: string;
 }) {
   const range = monthRange(month);
-  const [items, { data: expenses }] = await Promise.all([
+  const [items, { data: expenses }, extra] = await Promise.all([
     finishedBetween(supabase, range.first, `${range.next}-01`, tz),
     supabase
       .from("expenses")
@@ -225,9 +251,10 @@ async function ExpensesTab({
       .lte("spent_on", range.last)
       .order("spent_on", { ascending: false })
       .order("created_at", { ascending: false }),
+    extraIncome(supabase, range.first, `${range.next}-01`, tz),
   ]);
   const list = (expenses ?? []) as Expense[];
-  const income = items.reduce((s, a) => s + paidAmount(a), 0);
+  const income = items.filter(isCashIn).reduce((s, a) => s + paidAmount(a), 0) + extra.total;
   const spent = list.reduce((s, e) => s + Number(e.amount), 0);
   const result = income - spent;
 
@@ -360,7 +387,7 @@ function FinishedList({ items, tz, showDay }: { items: Finished[]; tz: string; s
           </span>
           <span className="text-right">
             <span className="block font-semibold">{formatCurrency(paidAmount(a))}</span>
-            <span className={cn("block text-xs", a.payment_method ? "text-muted-foreground" : "text-amber-700")}>
+            <span className={cn("block text-xs", a.payment_method ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}>
               {a.payment_method ? PAYMENT_LABEL[a.payment_method] : "Sem registro"}
             </span>
           </span>
@@ -421,7 +448,7 @@ function Stat({
         className={cn(
           "truncate text-base font-semibold",
           tone === "negative" && "text-destructive",
-          tone === "positive" && "text-emerald-700",
+          tone === "positive" && "text-emerald-700 dark:text-emerald-400",
         )}
       >
         {value}

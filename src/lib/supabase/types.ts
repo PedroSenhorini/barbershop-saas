@@ -9,7 +9,10 @@ export type AppointmentStatus =
 
 export type StaffRole = "owner" | "barber";
 
-export type PaymentMethod = "dinheiro" | "pix" | "cartao";
+/** fiado = pago depois (debt_payments); plano = coberto pelo Clube. */
+export type PaymentMethod = "dinheiro" | "pix" | "cartao" | "fiado" | "plano";
+/** Formas em que o dinheiro entra de verdade (caixa, Pix, maquininha). */
+export type CashMethod = "dinheiro" | "pix" | "cartao";
 
 export type ExpenseCategory =
   | "produtos"
@@ -27,6 +30,8 @@ export type Product = {
   name: string;
   quantity: number;
   min_quantity: number;
+  /** Preço de venda no balcão; null = só uso interno. */
+  sale_price: number | null;
   created_at: string;
 };
 
@@ -76,6 +81,15 @@ export type Barbershop = {
   timezone: string;
   weekly_hours: WeeklyHours;
   active: boolean;
+  cashback_percent: number;
+  google_review_url: string | null;
+  meta_pixel_id: string | null;
+  about: string | null;
+  instagram: string | null;
+  plan: "teste" | "ativo" | "individual" | "duo" | "time" | "premium";
+  trial_ends_at: string | null;
+  referral_code: string;
+  referred_by: string | null;
   created_at: string;
 };
 
@@ -87,6 +101,9 @@ export type StaffUser = {
   avatar_url: string | null;
   active: boolean;
   takes_appointments: boolean;
+  commission_percent: number;
+  product_commission_percent: number;
+  monthly_goal: number | null;
   created_at: string;
 };
 
@@ -106,6 +123,12 @@ export type Appointment = {
   barbershop_id: string;
   service_id: string;
   barber_id: string | null;
+  /** Cadastro do cliente, ligado pelo telefone (trigger no schema.sql). */
+  customer_id: string | null;
+  /** Série de horário fixo. */
+  series_id: string | null;
+  /** Origem do agendamento (?origem= no link). */
+  source: string | null;
   customer_name: string;
   customer_phone: string;
   scheduled_at: string;
@@ -120,9 +143,190 @@ export type Appointment = {
   updated_at: string;
 };
 
+export type Customer = {
+  id: string;
+  barbershop_id: string;
+  name: string;
+  phone: string; // só dígitos
+  notes: string | null;
+  tags: string[];
+  last_contacted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Linha da view customer_stats (números de cada cliente, calculados no banco). */
+export type CustomerStats = {
+  customer_id: string;
+  barbershop_id: string;
+  visits: number;
+  first_visit_at: string | null;
+  last_visit_at: string | null;
+  next_appointment_at: string | null;
+  no_shows: number;
+  total_spent: number;
+};
+
+export type TimeBlock = {
+  id: string;
+  barbershop_id: string;
+  barber_id: string | null;
+  starts_at: string;
+  ends_at: string;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type WaitlistPeriod = "qualquer" | "manha" | "tarde" | "noite";
+export type WaitlistStatus = "aguardando" | "avisado" | "agendado" | "desistiu";
+
+export type WaitlistEntry = {
+  id: string;
+  barbershop_id: string;
+  customer_name: string;
+  customer_phone: string;
+  service_id: string | null;
+  barber_id: string | null;
+  preferred_date: string | null;
+  preferred_period: WaitlistPeriod;
+  notes: string | null;
+  status: WaitlistStatus;
+  notified_at: string | null;
+  created_at: string;
+};
+
+export type Sale = {
+  id: string;
+  barbershop_id: string;
+  customer_id: string | null;
+  appointment_id: string | null;
+  seller_id: string | null;
+  payment_method: Exclude<PaymentMethod, "plano">;
+  subtotal: number;
+  discount: number;
+  total: number;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type SaleItem = {
+  id: string;
+  sale_id: string;
+  barbershop_id: string;
+  product_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+};
+
+export type DebtPayment = {
+  id: string;
+  barbershop_id: string;
+  appointment_id: string | null;
+  sale_id: string | null;
+  amount: number;
+  payment_method: CashMethod;
+  paid_on: string;
+  received_by: string | null;
+  created_at: string;
+};
+
+export type CashMovementKind = "abertura" | "sangria" | "suprimento";
+
+export type CashMovement = {
+  id: string;
+  barbershop_id: string;
+  day: string;
+  kind: CashMovementKind;
+  amount: number;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type CashbackEntry = {
+  id: string;
+  barbershop_id: string;
+  customer_id: string;
+  appointment_id: string | null;
+  amount: number;
+  reason: "credito" | "uso" | "ajuste";
+  created_by: string | null;
+  created_at: string;
+};
+
+export type CustomerFeedback = {
+  id: string;
+  barbershop_id: string;
+  appointment_id: string;
+  customer_id: string | null;
+  barber_id: string | null;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+};
+
+export type ClubPlan = {
+  id: string;
+  barbershop_id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  uses_per_month: number | null;
+  active: boolean;
+  created_at: string;
+};
+
+export type ClubSubscription = {
+  id: string;
+  barbershop_id: string;
+  customer_id: string;
+  plan_id: string;
+  price: number;
+  status: "ativa" | "cancelada";
+  started_on: string;
+  next_due_on: string;
+  canceled_on: string | null;
+  sold_by: string | null;
+  created_at: string;
+};
+
+export type ClubPayment = {
+  id: string;
+  barbershop_id: string;
+  subscription_id: string;
+  amount: number;
+  payment_method: CashMethod;
+  paid_on: string;
+  period_start: string;
+  received_by: string | null;
+  created_at: string;
+};
+
+export type Lead = {
+  id: string;
+  barbershop_id: string;
+  name: string;
+  phone: string;
+  referred_by_phone: string | null;
+  source: string | null;
+  status: "novo" | "contatado" | "virou_cliente";
+  created_at: string;
+};
+
 export type AppointmentWithRelations = Appointment & {
   service: Pick<Service, "id" | "name" | "duration_minutes" | "price"> | null;
   barber: Pick<StaffUser, "id" | "full_name"> | null;
+};
+
+/** Tabela sem relacionamentos declarados (embeds usam o nome da FK). */
+type Table<Row, Required extends keyof Row> = {
+  Row: Row;
+  Insert: Partial<Row> & Pick<Row, Required>;
+  Update: Partial<Row>;
+  Relationships: [];
 };
 
 export type Database = {
@@ -200,6 +404,26 @@ export type Database = {
           },
         ];
       };
+      customers: {
+        Row: Customer;
+        // O banco recusa insert pelo app (criação só pelo trigger); o tipo
+        // existe porque o supabase-js exige um Insert com formato de objeto.
+        Insert: Partial<Customer> & Pick<Customer, "barbershop_id" | "name" | "phone">;
+        Update: Partial<Pick<Customer, "name" | "notes" | "tags" | "last_contacted_at">>;
+        Relationships: [];
+      };
+      time_blocks: Table<TimeBlock, "barbershop_id" | "starts_at" | "ends_at">;
+      waitlist_entries: Table<WaitlistEntry, "barbershop_id" | "customer_name" | "customer_phone">;
+      sales: Table<Sale, "barbershop_id" | "payment_method" | "subtotal" | "total">;
+      sale_items: Table<SaleItem, "sale_id" | "barbershop_id" | "description" | "quantity" | "unit_price">;
+      debt_payments: Table<DebtPayment, "barbershop_id" | "amount" | "payment_method">;
+      cash_movements: Table<CashMovement, "barbershop_id" | "day" | "kind" | "amount">;
+      cashback_entries: Table<CashbackEntry, "barbershop_id" | "customer_id" | "amount" | "reason">;
+      customer_feedback: Table<CustomerFeedback, "barbershop_id" | "appointment_id" | "rating">;
+      club_plans: Table<ClubPlan, "barbershop_id" | "name" | "price">;
+      club_subscriptions: Table<ClubSubscription, "barbershop_id" | "customer_id" | "plan_id" | "price">;
+      club_payments: Table<ClubPayment, "barbershop_id" | "subscription_id" | "amount" | "payment_method" | "period_start">;
+      leads: Table<Lead, "barbershop_id" | "name" | "phone">;
       products: {
         Row: Product;
         Insert: Partial<Product> & Pick<Product, "barbershop_id" | "name">;
@@ -220,7 +444,12 @@ export type Database = {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      customer_stats: {
+        Row: CustomerStats;
+        Relationships: [];
+      };
+    };
     Functions: {
       register_purchase: {
         Args: { p_product_id: string; p_quantity: number; p_amount: number; p_spent_on: string };
@@ -229,6 +458,22 @@ export type Database = {
       adjust_stock: {
         Args: { p_product_id: string; p_delta: number };
         Returns: number;
+      };
+      register_sale: {
+        Args: {
+          p_items: { product_id?: string | null; description?: string; quantity: number; unit_price?: number }[];
+          p_payment_method: string;
+          p_discount?: number;
+          p_customer_id?: string | null;
+          p_appointment_id?: string | null;
+          p_seller_id?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: string;
+      };
+      register_club_payment: {
+        Args: { p_subscription_id: string; p_amount: number; p_method: string; p_paid_on: string };
+        Returns: string;
       };
     };
   };

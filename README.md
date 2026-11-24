@@ -18,7 +18,7 @@ Supabase (`@supabase/ssr`). Testes com Vitest.
 2. No **SQL Editor**, rode nesta ordem:
    - `supabase/schema.sql` — tabelas, RLS multi-tenant, permissões e Realtime.
    - `supabase/seed.sql` (opcional) — barbearia de demonstração com agenda de
-     hoje (login: `dono@cartolabarbearia.com.br` / senha `demo1234`).
+     hoje (login: `dono@barbeariamodelo.com.br` / senha `demo1234`).
 3. Copie `.env.example` para `.env.local` e preencha:
 
    | Variável | Obrigatória | O que é |
@@ -63,7 +63,13 @@ nada.
    cancela. Ao finalizar, o barbeiro registra a forma de pagamento.
 3. **Financeiro**: caixa do dia com conferência do dinheiro, gastos do mês e
    estoque (só o dono); o barbeiro vê só o próprio faturamento.
-4. **Serviços**, **Equipe** e **Ajustes** (só o dono): preços e durações,
+4. **Clientes**: o cadastro nasce sozinho a cada agendamento (um por
+   telefone). A lista separa novos, ativos e sumidos; "sumido" é quem passou
+   50% do tempo em que costuma voltar (pela frequência do próprio cliente, no
+   mínimo 3 semanas) e não tem horário marcado. A ficha mostra histórico,
+   observações da equipe e um botão que abre o WhatsApp com a mensagem para
+   chamar de volta. Valores gastos aparecem só para o dono.
+5. **Serviços**, **Equipe** e **Ajustes** (só o dono): preços e durações,
    barbeiros (com senha inicial definida pelo dono), horários por dia da
    semana com intervalo de almoço, e o link da barbearia.
 
@@ -85,6 +91,8 @@ dependem do Supabase:
 - `src/lib/hours.test.ts` — expediente por dia da semana, dia fechado,
   intervalo de almoço, serviço que não cabe antes de fechar, validação do
   formulário de horários.
+- `src/lib/customers.test.ts` — novos, ativos e sumidos pela frequência de
+  cada cliente, teto e piso do prazo, busca por nome sem acento e telefone.
 - `src/lib/slots.test.ts` — horários livres: sobreposição, barbeiro
   específico vs. "qualquer um", agendamento sem barbeiro ocupando a
   capacidade da equipe, horários no passado.
@@ -136,12 +144,14 @@ src/
         board.tsx                    # agenda do dia (quadro)
         new-appointment-dialog.tsx   # encaixe manual
         financeiro/                  # caixa, gastos, estoque
+        clientes/                    # lista e ficha do cliente
         servicos/  equipe/  ajustes/
   components/
     anti-spam.tsx          # campo-isca e widget do Turnstile
   lib/
     availability.ts        # busca dados e cria agendamento
     slots.ts               # regra pura de horários livres (testada)
+    customers.ts           # novos/ativos/sumidos (testada)
     hours.ts               # expediente semanal e geração de horários
     time.ts                # datas sempre no fuso da barbearia
     finance.ts             # rótulos e contas do financeiro

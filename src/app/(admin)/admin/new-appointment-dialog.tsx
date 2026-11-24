@@ -97,7 +97,9 @@ export function NewAppointmentDialog({
       render={
         <Button size="lg" className="h-10 gap-1.5">
           <Plus className="size-4" />
-          Novo agendamento
+          Novo
+          {/* Em telas estreitas o texto completo não cabe ao lado de Lista/Quadro. */}
+          <span className="hidden min-[420px]:inline">agendamento</span>
         </Button>
       }
     />

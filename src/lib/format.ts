@@ -25,7 +25,7 @@ export function formatDuration(minutes: number) {
   return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
 }
 
-/** "Cartola Barbearia & Cia" → "cartola-barbearia-cia". */
+/** "Barbearia do Zé & Cia" → "barbearia-do-ze-cia". */
 export function slugify(value: string) {
   return value
     .normalize("NFD")

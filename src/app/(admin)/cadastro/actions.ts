@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_WEEKLY_HOURS } from "@/lib/hours";
 import { onlyDigits, slugify } from "@/lib/format";
+import { normalizeReferralCode } from "@/lib/referral";
 import { RESERVED_SLUGS } from "@/lib/slugs";
 import { HONEYPOT_FIELD, TURNSTILE_FIELD, verifyTurnstile } from "@/lib/turnstile";
 
@@ -102,6 +103,13 @@ export async function signUp(
   }
   const userId = created.user.id;
 
+  // Indicação (/cadastro?ref=CODIGO): guarda quem indicou. Código inválido
+  // ou inexistente só é ignorado; não impede o cadastro.
+  const referralCode = normalizeReferralCode(formData.get("ref"));
+  const { data: referrer } = referralCode
+    ? await admin.from("barbershops").select("id").eq("referral_code", referralCode).maybeSingle()
+    : { data: null };
+
   const { data: barbershop, error: shopError } = await admin
     .from("barbershops")
     .insert({
@@ -109,6 +117,7 @@ export async function signUp(
       slug: await uniqueSlug(input.barbershopName),
       phone: input.phone,
       weekly_hours: DEFAULT_WEEKLY_HOURS,
+      referred_by: referrer?.id ?? null,
     })
     .select("id")
     .single();

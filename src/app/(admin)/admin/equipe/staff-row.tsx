@@ -42,10 +42,10 @@ export function StaffRow({ member, isSelf }: { member: StaffUser; isSelf: boolea
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <Badge variant="outline">{member.role === "owner" ? "Dono" : "Barbeiro"}</Badge>
-          <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground md:min-h-0">
             <input
               type="checkbox"
-              className="size-4 accent-primary"
+              className="size-5 accent-primary md:size-4"
               checked={member.takes_appointments}
               disabled={pending}
               onChange={(e) => toggle(e.target.checked)}

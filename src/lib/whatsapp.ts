@@ -59,3 +59,58 @@ export function customerNoticeMessage(a: AppointmentMessage) {
   const barber = a.barberName ? ` com ${firstName(a.barberName)}` : "";
   return `Olá! Acabei de agendar pelo site: ${a.serviceName}${barber}, ${a.dayLabel} às ${a.timeLabel}. Meu nome é ${a.customerName}.`;
 }
+
+/** Mensagem curta para abrir conversa com um cliente pela ficha. */
+export function helloMessage(customerName: string) {
+  return `Olá, ${firstName(customerName)}!`;
+}
+
+/** Para chamar de volta um cliente que passou do tempo em que costuma vir. */
+export function comeBackMessage(a: {
+  customerName: string;
+  barbershopName: string;
+  bookingUrl: string;
+}) {
+  return `Olá, ${firstName(a.customerName)}! Tudo bem? Faz um tempinho que você não passa aqui na ${a.barbershopName} 💈\n\nQue tal já deixar o próximo corte marcado? É rapidinho pelo link:\n${a.bookingUrl}`;
+}
+
+/** Lista de espera: abriu vaga. */
+export function vacancyMessage(a: { customerName: string; barbershopName: string; bookingUrl: string }) {
+  return `Olá, ${firstName(a.customerName)}! Abriu uma vaga aqui na ${a.barbershopName} ✂️\n\nSe ainda quiser, garanta pelo link antes que alguém pegue:\n${a.bookingUrl}`;
+}
+
+/** Pedido de avaliação no Google, enviado pela ficha do cliente. */
+export function reviewRequestMessage(a: { customerName: string; barbershopName: string; reviewUrl: string }) {
+  return `Olá, ${firstName(a.customerName)}! Obrigado por vir na ${a.barbershopName} 💈\n\nSe curtiu o atendimento, deixa uma avaliação pra gente no Google? Ajuda demais:\n${a.reviewUrl}`;
+}
+
+/** Lembrete de fiado em aberto. */
+export function debtMessage(a: { customerName: string; barbershopName: string; amount: string }) {
+  return `Olá, ${firstName(a.customerName)}! Tudo bem? Passando para lembrar do valor de ${a.amount} em aberto aqui na ${a.barbershopName}. Pode acertar por Pix ou na próxima visita. Obrigado!`;
+}
+
+/** Mensalidade do Clube vencendo ou vencida. */
+export function clubDueMessage(a: {
+  customerName: string;
+  barbershopName: string;
+  planName: string;
+  amount: string;
+  dueLabel: string;
+  overdue: boolean;
+}) {
+  const when = a.overdue ? `venceu em ${a.dueLabel}` : `vence em ${a.dueLabel}`;
+  return `Olá, ${firstName(a.customerName)}! A mensalidade do seu plano ${a.planName} (${a.amount}) na ${a.barbershopName} ${when}. Pode pagar por Pix ou na sua próxima visita. Obrigado! 👑`;
+}
+
+/** Cadastro da porta / indicação: primeiro contato com o link de agendamento. */
+export function leadWelcomeMessage(a: {
+  customerName: string;
+  barbershopName: string;
+  bookingUrl: string;
+  referred?: boolean;
+}) {
+  const intro = a.referred
+    ? `Um amigo seu indicou a ${a.barbershopName} 💈`
+    : `Aqui é da ${a.barbershopName}, obrigado pelo cadastro 💈`;
+  return `Olá, ${firstName(a.customerName)}! ${intro}\n\nQuando quiser marcar seu horário, é rapidinho pelo link:\n${a.bookingUrl}`;
+}
